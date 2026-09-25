@@ -54,17 +54,21 @@ def main():
 
     test_predictions = model.predict(test_features, batch_size=BATCH_SIZE, verbose=1)
 
-    # Metrics are calculated on the scaled targets to measure model learning.
+    target_scaler = processed_data["target_scaler"]
+    unscaled_test_targets = target_scaler.inverse_transform(test_targets)
+    unscaled_test_predictions = target_scaler.inverse_transform(test_predictions)
+
+    # Report metrics in the original MW units used by the source data.
     mean_absolute_error_value = mean_absolute_error(
-        test_targets, test_predictions
+        unscaled_test_targets, unscaled_test_predictions
     )
     root_mean_squared_error = np.sqrt(
-        mean_squared_error(test_targets, test_predictions)
+        mean_squared_error(unscaled_test_targets, unscaled_test_predictions)
     )
     mean_absolute_percentage_error_value = mean_absolute_percentage_error(
-        test_targets, test_predictions
+        unscaled_test_targets, unscaled_test_predictions
     )
-    r_squared = r2_score(test_targets, test_predictions)
+    r_squared = r2_score(unscaled_test_targets, unscaled_test_predictions)
 
     print(f"Test MAE: {mean_absolute_error_value:.6f}")
     print(f"Test RMSE: {root_mean_squared_error:.6f}")
@@ -73,13 +77,17 @@ def main():
 
     # Flag test predictions whose errors exceed the 95th percentile of training errors.
     train_predictions = model.predict(train_features, batch_size=BATCH_SIZE, verbose=1)
-    train_absolute_errors = np.abs(train_targets - train_predictions)
+    unscaled_train_targets = target_scaler.inverse_transform(train_targets)
+    unscaled_train_predictions = target_scaler.inverse_transform(train_predictions)
+    train_absolute_errors = np.abs(unscaled_train_targets - unscaled_train_predictions)
     anomaly_threshold = np.percentile(train_absolute_errors, 95)
 
-    test_absolute_errors = np.abs(test_targets - test_predictions)
+    test_absolute_errors = np.abs(
+        unscaled_test_targets - unscaled_test_predictions
+    )
     anomalies = np.any(test_absolute_errors > anomaly_threshold, axis=1)
 
-    print(f"Anomaly Threshold: {anomaly_threshold:.6f}")
+    print(f"Anomaly Threshold (MW): {anomaly_threshold:.6f}")
     print(f"Anomalies detected in test set: {np.sum(anomalies)}")
 
     plt.figure(figsize=(10, 6))
